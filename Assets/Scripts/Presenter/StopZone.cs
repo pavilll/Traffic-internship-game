@@ -6,20 +6,18 @@ public class StopZone : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
-        if (other.TryGetComponent<CarView>(out var car))
+        if (other.TryGetComponent<CarPresenter>(out var car))
         {
-            if (trafficLight.IsGreen())
-                car.SetMove(true);
-            else
-                car.SetMove(false);
+            bool stop = !trafficLight.IsGreen();
+            car.SetBlockedByLight(stop);
         }
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (other.TryGetComponent<CarView>(out var car))
+        if (other.TryGetComponent<CarPresenter>(out var car))
         {
-            car.SetMove(true);
+            car.SetBlockedByLight(false);
         }
     }
 }
