@@ -4,12 +4,19 @@ public class StopZone : MonoBehaviour
 {
     public TrafficLightPresenter trafficLight;
 
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.TryGetComponent<CarPresenter>(out var car))
+        {
+            car.OnEnterZone(trafficLight.GetState());
+        }
+    }
+
     private void OnTriggerStay(Collider other)
     {
         if (other.TryGetComponent<CarPresenter>(out var car))
         {
-            bool stop = !trafficLight.IsGreen();
-            car.SetBlockedByLight(stop);
+            car.SetLightState(trafficLight.GetState());
         }
     }
 
@@ -17,7 +24,7 @@ public class StopZone : MonoBehaviour
     {
         if (other.TryGetComponent<CarPresenter>(out var car))
         {
-            car.SetBlockedByLight(false);
+            car.OnExitZone();
         }
     }
 }

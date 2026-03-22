@@ -4,7 +4,10 @@ public class CarPresenter : MonoBehaviour
 {
     private CarView view;
 
-    private bool blockedByLight = false;
+    private TrafficLightState currentLightState;
+
+    private bool isInZone = false;
+    private bool enteredBeforeYellow = false;
 
     [SerializeField] private float checkDistance = 5f;
 
@@ -16,16 +19,52 @@ public class CarPresenter : MonoBehaviour
     private void Update()
     {
         bool blockedByCar = IsCarAhead();
+        bool blockedByLight = ShouldStopByLight();
 
-        // если есть хоть одна причина остановки → стоим
-        bool shouldStop = blockedByLight || blockedByCar;
-
-        view.SetMove(!shouldStop);
+        view.SetMove(!(blockedByCar || blockedByLight));
     }
 
-    public void SetBlockedByLight(bool value)
+    // вызывается при входе в триггер
+    public void OnEnterZone(TrafficLightState state)
     {
-        blockedByLight = value;
+        isInZone = true;
+        currentLightState = state;
+
+        // ключевая логика
+        enteredBeforeYellow = (state == TrafficLightState.Green || 
+                               state == TrafficLightState.BlinkingGreen);
+    }
+
+    public void OnExitZone()
+    {
+        isInZone = false;
+        enteredBeforeYellow = false;
+    }
+
+    public void SetLightState(TrafficLightState state)
+    {
+        currentLightState = state;
+    }
+
+    private bool ShouldStopByLight()
+    {
+        if (!isInZone) return false;
+
+        switch (currentLightState)
+        {
+            case TrafficLightState.Green:
+            case TrafficLightState.BlinkingGreen:
+                return false;
+
+            case TrafficLightState.Yellow:
+                // 🔥 ВОТ ТУТ ВЕСЬ СМЫСЛ
+                return !enteredBeforeYellow;
+
+            case TrafficLightState.Red:
+                return true;
+        }
+
+        return false;
     }
 
     private bool IsCarAhead()
