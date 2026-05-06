@@ -12,22 +12,53 @@ public enum TrafficLightState
 public class TrafficLightPresenter : MonoBehaviour
 {
     private TrafficLightState state = TrafficLightState.Red;
-    private bool isSwitching = false;
+    private bool isSwitching;
+    private Coroutine blinkRoutine;
 
     [Header("Timings")]
-    public float blinkingDuration = 2f;
-    public float yellowDuration = 1f;
+    [SerializeField] private float blinkingDuration = 2f;
+    [SerializeField] private float yellowDuration = 1f;
 
-    [Header("Lamps")]
-    [SerializeField] private Renderer redLamp;
-    [SerializeField] private Renderer yellowLamp;
-    [SerializeField] private Renderer greenLamp;
+    [Header("Renderer Fallback")]
+    [SerializeField] private Renderer signalRenderer;
+    [SerializeField] private string rendererNameHint = "Traffic";
 
     [SerializeField] private float intensity = 5f;
 
+    private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
+    private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorProperty = Shader.PropertyToID("_Color");
+
+    private void Awake()
+    {
+        if (signalRenderer == null)
+        {
+            signalRenderer = GetComponent<Renderer>();
+        }
+
+        if (signalRenderer == null)
+        {
+            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+
+            foreach (Renderer childRenderer in renderers)
+            {
+                if (childRenderer.name.Contains(rendererNameHint))
+                {
+                    signalRenderer = childRenderer;
+                    break;
+                }
+            }
+
+            if (signalRenderer == null && renderers.Length > 0)
+            {
+                signalRenderer = renderers[0];
+            }
+        }
+    }
+
     private void Start()
     {
-        SetStateVisual(TrafficLightState.Red);
+        SetStateVisual(state);
     }
 
     public TrafficLightState GetState()
@@ -53,17 +84,15 @@ public class TrafficLightPresenter : MonoBehaviour
     {
         isSwitching = true;
 
-        // мигающий зелёный
         state = TrafficLightState.BlinkingGreen;
-        StartCoroutine(BlinkGreen());
+        SetStateVisual(state);
+        blinkRoutine = StartCoroutine(BlinkGreen());
         yield return new WaitForSeconds(blinkingDuration);
 
-        // жёлтый
         state = TrafficLightState.Yellow;
         SetStateVisual(state);
         yield return new WaitForSeconds(yellowDuration);
 
-        // красный
         state = TrafficLightState.Red;
         SetStateVisual(state);
 
@@ -73,13 +102,12 @@ public class TrafficLightPresenter : MonoBehaviour
     private IEnumerator SwitchToGreenSequence()
     {
         isSwitching = true;
+        StopBlinking();
 
-        // жёлтый
         state = TrafficLightState.Yellow;
         SetStateVisual(state);
         yield return new WaitForSeconds(yellowDuration);
 
-        // зелёный
         state = TrafficLightState.Green;
         SetStateVisual(state);
 
@@ -88,9 +116,24 @@ public class TrafficLightPresenter : MonoBehaviour
 
     private void SetStateVisual(TrafficLightState newState)
     {
-        SetLamp(redLamp, newState == TrafficLightState.Red, Color.red);
-        SetLamp(yellowLamp, newState == TrafficLightState.Yellow, Color.yellow);
-        SetLamp(greenLamp, newState == TrafficLightState.Green, Color.green);
+        if (signalRenderer == null)
+        {
+            return;
+        }
+
+        switch (newState)
+        {
+            case TrafficLightState.Green:
+            case TrafficLightState.BlinkingGreen:
+                SetLamp(signalRenderer, true, Color.green);
+                break;
+            case TrafficLightState.Yellow:
+                SetLamp(signalRenderer, true, Color.yellow);
+                break;
+            default:
+                SetLamp(signalRenderer, true, Color.red);
+                break;
+        }
     }
 
     private void SetLamp(Renderer lamp, bool active, Color color)
@@ -103,11 +146,26 @@ public class TrafficLightPresenter : MonoBehaviour
 
         if (active)
         {
-            mat.SetColor("_EmissionColor", color * intensity);
+            if (mat.HasProperty(BaseColor))
+            {
+                mat.SetColor(BaseColor, color);
+            }
+            else if (mat.HasProperty(ColorProperty))
+            {
+                mat.SetColor(ColorProperty, color);
+            }
+
+            if (mat.HasProperty(EmissionColor))
+            {
+                mat.SetColor(EmissionColor, color * intensity);
+            }
         }
         else
         {
-            mat.SetColor("_EmissionColor", Color.black);
+            if (mat.HasProperty(EmissionColor))
+            {
+                mat.SetColor(EmissionColor, Color.black);
+            }
         }
     }
 
@@ -118,7 +176,7 @@ public class TrafficLightPresenter : MonoBehaviour
 
         while (state == TrafficLightState.BlinkingGreen)
         {
-            SetLamp(greenLamp, on, Color.green);
+            SetLamp(signalRenderer, on, Color.green);
 
             on = !on;
 
@@ -128,5 +186,23 @@ public class TrafficLightPresenter : MonoBehaviour
             if (timer >= blinkingDuration)
                 break;
         }
+
+        blinkRoutine = null;
+    }
+
+    private void StopBlinking()
+    {
+        if (blinkRoutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(blinkRoutine);
+        blinkRoutine = null;
+    }
+
+    private void OnDisable()
+    {
+        StopBlinking();
     }
 }
