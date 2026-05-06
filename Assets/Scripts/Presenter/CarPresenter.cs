@@ -1,27 +1,42 @@
 using UnityEngine;
 
+[RequireComponent(typeof(CarView))]
 public class CarPresenter : MonoBehaviour
 {
     private CarView view;
-
     private TrafficLightState currentLightState;
+    private bool isInZone;
+    private bool enteredBeforeYellow;
 
-    private bool isInZone = false;
-    private bool enteredBeforeYellow = false;
-
-    [SerializeField] private float checkDistance = 5f;
+    [SerializeField] private float checkDistance = 8f;
+    [SerializeField] private float stopBuffer = 1.5f;
+    [SerializeField] private float slowDownDistance = 6.5f;
+    [SerializeField] private float minFollowGap = 2.2f;
+    [SerializeField] private LayerMask carLayer = 1 << 3;
 
     private void Awake()
     {
         view = GetComponent<CarView>();
+
+        if (view == null)
+        {
+            Debug.LogError("CarPresenter: CarView component is missing.", this);
+            enabled = false;
+        }
     }
 
     private void Update()
     {
-        bool blockedByCar = IsCarAhead();
+        if (view == null)
+        {
+            return;
+        }
+
+        float speedFactor = GetCarAheadSpeedFactor();
         bool blockedByLight = ShouldStopByLight();
 
-        view.SetMove(!(blockedByCar || blockedByLight));
+        view.SetMove(!blockedByLight);
+        view.SetSpeedFactor(blockedByLight ? 0f : speedFactor);
     }
 
     // вызывается при входе в триггер
@@ -30,7 +45,6 @@ public class CarPresenter : MonoBehaviour
         isInZone = true;
         currentLightState = state;
 
-        // ключевая логика
         enteredBeforeYellow = (state == TrafficLightState.Green || 
                                state == TrafficLightState.BlinkingGreen);
     }
@@ -57,7 +71,6 @@ public class CarPresenter : MonoBehaviour
                 return false;
 
             case TrafficLightState.Yellow:
-                // 🔥 ВОТ ТУТ ВЕСЬ СМЫСЛ
                 return !enteredBeforeYellow;
 
             case TrafficLightState.Red:
@@ -67,19 +80,47 @@ public class CarPresenter : MonoBehaviour
         return false;
     }
 
-    private bool IsCarAhead()
+    private float GetCarAheadSpeedFactor()
     {
-        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        float frontExtent = view != null ? view.GetForwardExtent() : 1f;
+        float sideExtent = view != null ? view.GetSideExtent() : 0.5f;
+        float sphereRadius = Mathf.Max(0.35f, sideExtent * 0.6f);
+        Vector3 origin = transform.position + Vector3.up * 0.5f + transform.forward * Mathf.Max(0f, frontExtent - sphereRadius);
 
-        if (Physics.Raycast(origin, transform.forward, out RaycastHit hit, checkDistance))
+        if (Physics.SphereCast(origin, sphereRadius, transform.forward, out RaycastHit hit, checkDistance + stopBuffer, carLayer, QueryTriggerInteraction.Ignore))
         {
-            if (hit.collider.GetComponent<CarView>() != null &&
-                hit.collider.gameObject != gameObject)
+            CarView otherView = hit.collider.GetComponent<CarView>();
+
+            if (otherView == null)
             {
-                return true;
+                otherView = hit.collider.GetComponentInParent<CarView>();
+            }
+
+            if (otherView != null && otherView.gameObject != gameObject)
+            {
+                float gapToOtherCar = hit.distance;
+                if (gapToOtherCar <= minFollowGap)
+                {
+                    return 0f;
+                }
+
+                if (gapToOtherCar >= slowDownDistance)
+                {
+                    return 1f;
+                }
+
+                float normalizedGap = Mathf.InverseLerp(minFollowGap, slowDownDistance, gapToOtherCar);
+                return Mathf.SmoothStep(0f, 1f, normalizedGap);
             }
         }
 
-        return false;
+        return 1f;
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.cyan;
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        Gizmos.DrawLine(origin, origin + transform.forward * (checkDistance + stopBuffer));
     }
 }
