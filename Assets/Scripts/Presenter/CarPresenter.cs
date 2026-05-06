@@ -8,10 +8,10 @@ public class CarPresenter : MonoBehaviour
     private bool isInZone;
     private bool enteredBeforeYellow;
 
-    [SerializeField] private float checkDistance = 6f;
-    [SerializeField] private float stopBuffer = 1.2f;
-    [SerializeField] private float slowDownDistance = 5f;
-    [SerializeField] private float minFollowGap = 1.4f;
+    [SerializeField] private float checkDistance = 8f;
+    [SerializeField] private float stopBuffer = 1.5f;
+    [SerializeField] private float slowDownDistance = 6.5f;
+    [SerializeField] private float minFollowGap = 2.2f;
     [SerializeField] private LayerMask carLayer = 1 << 3;
 
     private void Awake()

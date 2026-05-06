@@ -31,7 +31,7 @@ Transform:
   m_GameObject: {fileID: 3047939356286731724}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4, y: 0, z: 76}
+  m_LocalPosition: {x: 22.057137, y: 0.008671561, z: 100.28901}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -107,6 +107,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarView
   speed: 5
+  maxLifetime: 30
+  acceleration: 5
+  braking: 8
 --- !u!65 &-7793729403197584500
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -168,6 +171,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarPresenter
   checkDistance: 5
+  stopBuffer: 1.2
+  slowDownDistance: 5
+  minFollowGap: 1.4
   carLayer:
     serializedVersion: 2
     m_Bits: 8

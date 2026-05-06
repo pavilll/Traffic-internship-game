@@ -8,6 +8,8 @@ using UnityEditor;
 
 public class GamePresenter : MonoBehaviour
 {
+    private static PhysicsMaterial trafficCarMaterial;
+
     [SerializeField] private GameObject carPrefab;
     [SerializeField] private GameObject[] carPrefabs;
     [SerializeField] private Transform spawnPoint;
@@ -148,15 +150,18 @@ public class GamePresenter : MonoBehaviour
             body = car.AddComponent<Rigidbody>();
         }
 
-        body.useGravity = false;
-        body.isKinematic = true;
+        body.useGravity = true;
+        body.isKinematic = false;
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.constraints = RigidbodyConstraints.FreezeRotation;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        body.linearDamping = 0.5f;
+        body.angularDamping = 5f;
+        body.mass = 1200f;
 
-        if (car.GetComponent<Collider>() == null)
-        {
-            AddBoundsCollider(car);
-        }
+        EnsureTrafficCollidersExist(car);
+
+        ApplyTrafficPhysicsMaterial(car);
 
         if (car.GetComponent<CarView>() == null)
         {
@@ -175,7 +180,18 @@ public class GamePresenter : MonoBehaviour
         }
     }
 
-    private void AddBoundsCollider(GameObject car)
+    private void EnsureTrafficCollidersExist(GameObject car)
+    {
+        Collider[] existingColliders = car.GetComponentsInChildren<Collider>();
+        if (existingColliders.Length > 0)
+        {
+            return;
+        }
+
+        AddFallbackCollider(car);
+    }
+
+    private void AddFallbackCollider(GameObject car)
     {
         Renderer[] renderers = car.GetComponentsInChildren<Renderer>();
         if (renderers.Length == 0)
@@ -190,13 +206,31 @@ public class GamePresenter : MonoBehaviour
         }
 
         BoxCollider collider = car.AddComponent<BoxCollider>();
-        collider.center = car.transform.InverseTransformPoint(bounds.center);
-
         Vector3 lossyScale = car.transform.lossyScale;
+        collider.center = car.transform.InverseTransformPoint(bounds.center);
         collider.size = new Vector3(
             SafeDivide(bounds.size.x, lossyScale.x),
             SafeDivide(bounds.size.y, lossyScale.y),
             SafeDivide(bounds.size.z, lossyScale.z));
+    }
+
+    private void ApplyTrafficPhysicsMaterial(GameObject car)
+    {
+        if (trafficCarMaterial == null)
+        {
+            trafficCarMaterial = new PhysicsMaterial("TrafficCarMaterial");
+            trafficCarMaterial.dynamicFriction = 0.05f;
+            trafficCarMaterial.staticFriction = 0.05f;
+            trafficCarMaterial.bounciness = 0f;
+            trafficCarMaterial.frictionCombine = PhysicsMaterialCombine.Minimum;
+            trafficCarMaterial.bounceCombine = PhysicsMaterialCombine.Minimum;
+        }
+
+        Collider[] colliders = car.GetComponentsInChildren<Collider>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            colliders[i].material = trafficCarMaterial;
+        }
     }
 
     private int LayerMaskToLayerIndex(LayerMask mask, int fallbackLayer)
